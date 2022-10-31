@@ -14,4 +14,4 @@ clean_data:
 group_data:
   group: True
   by: shop_id
-  group_number: 0
+  group_number: 3

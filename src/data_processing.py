@@ -1,5 +1,5 @@
 import pandas as pd
-import yaml
+
 
 class FeatureGenerator:
     """Class for joining, extracting and transforming data
@@ -88,27 +88,56 @@ class FeatureGenerator:
         )
         df_long = df_long.reset_index()
         return df_long
-    
 
-def clean_data(df, target, percentile):
+
+class TrainDataset:
+    def __init__(
+        self, 
+        data: pd.DataFrame, 
+        features: list,
+        target: str,
+        window_size: int,
+        start: int
+    ):
+        self.data = data
+        self.features = features
+        self.target = target
+        self.window = window_size
+        self.max_period = self.get_max_period()
+        self.start = start
+    
+    def get_max_period(self):
+        return self.data['date_block_num'].max()
+    
+    def train_validate_split(self, start, end):
+        train_data = self.data[
+            (self.data['date_block_num'] >= start) & \
+            (self.data['date_block_num'] < end)
+        ]
+        test_data = self.data[self.data['date_block_num']==end]
+        train_x, train_y = train_data[self.features], train_data[self.target]
+        test_x, test_y = test_data[self.features], test_data[self.target]
+        return train_x, test_x, train_y, test_y
+
+    def __iter__(self):
+        self.curr_index = self.start
+        return self
+    
+    def __next__(self):
+        if self.window + self.curr_index < self.max_period:
+            self.curr_index += 1
+            return self.train_validate_split(self.curr_index, self.window + self.curr_index)
+        raise StopIteration
+    
+    def __len__(self):
+        return self.max_period - self.window - self.start
+
+
+def clean_sales_data(df, target, percentile):
     df = df.drop_duplicates()
     perc = df[target].quantile(percentile)
     df = df[df[target] <= perc]
     return df
-
-
-def load_data(path):
-    return pd.read_csv(path)
-
-
-def save_data(df, path):
-    df.to_csv(path, index=False)
-
-
-def read_config(config_path):
-    with open(config_path) as yaml_file:
-        config = yaml.safe_load(yaml_file)
-    return config
 
 
 def group_data(df, by, group):

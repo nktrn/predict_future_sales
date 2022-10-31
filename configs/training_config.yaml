@@ -1,0 +1,20 @@
+features_config:
+  features: item_id
+          - date_block_num
+          - item_name
+          - item_category_name
+  target: item_cnt_day
+  cat: item_id
+     - date_block_num
+  text: item_name
+     - item_category_name
+
+train_data: data/processed/sales.csv
+
+model_config:
+  iterations: 10
+            - 50
+  lr: 0.1
+    - 0.01
+  depth: 4
+       - 8
