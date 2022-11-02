@@ -4,6 +4,9 @@ raw_data:
   items_categories_csv: data/raw/item_categories.csv
   sales_csv: data/raw/sales_train.csv
 
+cleaned_data:
+  sales_csv: data/cleaned/sales.csv
+
 processed_data:
   sales_csv: data/processed/sales.csv
 

@@ -137,6 +137,12 @@ def clean_sales_data(df, target, percentile):
     df = df.drop_duplicates()
     perc = df[target].quantile(percentile)
     df = df[df[target] <= perc]
+    shops = df[df['date_block_num'] > 28]['shop_id'].unique()
+    df = df[df['shop_id'].isin(shops)]
+    df['shop_item'] = df.apply(lambda x: str(x['item_id']) + '_' + str(x['shop_id']), axis=1)
+    items_shops = df[df['date_block_num'] > 22]['shop_item'].unique()
+    df = df[df['shop_item'].isin(items_shops)]
+    df = df.drop(columns=['shop_item'])
     return df
 
 

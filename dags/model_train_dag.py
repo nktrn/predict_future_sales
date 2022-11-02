@@ -24,7 +24,8 @@ def train_model(ti):
         24,
         6
     )
-    train.grid_search(config['model_config'], dataset, config['features_config'])
+    res = train.grid_search(config['model_config'], dataset, config['features_config'])
+    res.to_csv('/home/nktrn/D/predict_future_sales/data/res.csv', index=False)
     return 0
     
 

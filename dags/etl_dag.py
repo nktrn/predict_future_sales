@@ -13,26 +13,38 @@ def read_config():
     return config
 
 
-def process_data(ti):
+def clean_data(ti):
     config = ti.xcom_pull(task_ids=['read_config'])[0]
     if not config:
         raise Exception('No config file.')
 
     sales_df = ut.load_data(config['raw_data']['sales_csv'])
+    sales_df = dp.clean_sales_data(sales_df, config['clean_data']['target'], config['clean_data']['percentile'])
+    ut.save_data(sales_df, config['cleaned_data']['sales_csv'])
+
+
+def create_fg(config):
+    shop_df = ut.load_data(config['raw_data']['shop_csv'])
     items_df = ut.load_data(config['raw_data']['items_csv'])
     items_cat_df = ut.load_data(config['raw_data']['items_categories_csv'])
-    shop_df = ut.load_data(config['raw_data']['shop_csv'])
-
-    sales_df = dp.clean_sales_data(sales_df, config['clean_data']['target'], config['clean_data']['percentile'])
-
     fg = dp.FeatureGenerator(items_df, items_cat_df, shop_df)
+    return fg
+
+
+def process_data(ti):
+    xcoms = ti.xcom_pull(task_ids=['read_config'])
+    config = xcoms[0]
+
+    if not config:
+        raise Exception('No config file.')
+
+    sales_df = ut.load_data(config['cleaned_data']['sales_csv'])
+
+    fg = create_fg(config)
+
     sales_df = fg.fit_group(sales_df)
 
-    if config['group_data']['group']:
-        sales_df = dp.group_data(sales_df, config['group_data']['by'], config['group_data']['group_number'])
-    
     ut.save_data(sales_df, config['processed_data']['sales_csv'])
-    return 1
 
 
 with DAG(
@@ -48,10 +60,18 @@ with DAG(
         do_xcom_push=True
     )
 
-    # ETL
-    task_etl = PythonOperator(
-        task_id='do_etl',
+    # Clean data
+    task_clean_data = PythonOperator(
+        task_id='clean_data',
+        python_callable=clean_data,
+        do_xcom_push=True
+    )
+
+    # Generate features
+    task_create_features = PythonOperator(
+        task_id='generate_features',
         python_callable=process_data
     )
-    task_read_config >> task_etl
+
+    task_read_config >> task_clean_data >> task_create_features
 

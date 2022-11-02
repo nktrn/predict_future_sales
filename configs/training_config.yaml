@@ -3,9 +3,17 @@ features_config:
           - date_block_num
           - item_name
           - item_category_name
+          - shop_id
+          - item_category_id
+          - shop_location
+          - shop_city
   target: item_cnt_day
   cat: item_id
      - date_block_num
+     - shop_id
+     - item_category_id
+     - shop_location
+     - shop_city
   text: item_name
      - item_category_name
 
