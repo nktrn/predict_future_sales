@@ -1,28 +1,36 @@
-features_config:
-  features: item_id
+features:
+  features: 
+          - item_id
           - date_block_num
-          - item_name
-          - item_category_name
           - shop_id
           - item_category_id
           - shop_location
           - shop_city
   target: item_cnt_day
-  cat: item_id
+  categorial: 
+     - item_id
      - date_block_num
      - shop_id
      - item_category_id
      - shop_location
      - shop_city
-  text: item_name
-     - item_category_name
 
 train_data: data/processed/sales.csv
 
-model_config:
-  iterations: 10
+params:
+  iterations: 
+            - 10
             - 50
-  lr: 0.1
+  lr: 
+    - 0.1
+    - 0.05
     - 0.01
-  depth: 4
+  depth: 
+       - 4
        - 8
+
+shop: 36
+
+neptune:
+  project: nktrn/predict-future-sales
+  api_token: eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiI5ZjQ4MjNmNy0xOTZkLTQ2NzEtODY1NS0yNDkyZjBjZDBmMDEifQ==
