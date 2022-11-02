@@ -17,6 +17,8 @@ def train_model(ti):
         raise Exception('No config file.')
     
     data = utils.load_data(config['train_data'])
+    data = data.groupby(by=['shop_id'])
+    data = data.get_group(config['shop'])
     dataset = data_processing.TrainDataset(
         data,
         config['features']['features'],

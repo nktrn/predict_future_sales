@@ -4,6 +4,8 @@ from itertools import product
 import catboost
 import neptune.new as neptune
 
+import numpy as np
+
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 
 
@@ -21,23 +23,25 @@ def grid_search(dataset, config):
     )]
     model_configuration = config['params']
     save_pth = config['model_save']
-    for parameters in params_combination:
-        run = neptune.init(
+    run = neptune.init(
             project=config['neptune']['project'],
             api_token=config['neptune']['api_token']
         )
+    for i, parameters in enumerate(params_combination):
         parameters.update(model_configuration)
-        run['global/parameters'] = parameters
+        run[f'global/{i}/parameters'] = parameters
         
         model = catboost.CatBoostRegressor(**parameters)
         categorical_features = config['features']['categorical']
-        cross_validation(dataset, model, categorical_features, run, save_pth)
+        cross_validation(dataset, model, categorical_features, run, save_pth, i)
 
 
-def cross_validation(dataset, model, categorical_features, run, save_pth):
+def cross_validation(dataset, model, categorical_features, run, save_pth, i):
     mean_rmse, mean_mae = 0, 0
     n = len(dataset)
     for (x_train, x_test, y_train, y_test) in dataset:
+        noise = np.random.normal(0, 0.1, len(y_train))
+        y_train += noise
         train_pool = create_pool(x_train, y_train, categorical_features)
         test_pool = create_pool(x_test, y_test, categorical_features)
 
@@ -49,28 +53,14 @@ def cross_validation(dataset, model, categorical_features, run, save_pth):
 
         mean_rmse += fold_rmse
         mean_mae += fold_mae
-        run[f"global/metrics/rmse"].log(fold_rmse)
-        run[f"global/metrics/mae"].log(fold_mae)
+        run[f"global/{i}/metrics/rmse"].log(fold_rmse)
+        run[f"global/{i}/metrics/mae"].log(fold_mae)
 
     mean_rmse, mean_mae = mean_rmse/n, mean_mae/n
 
-    run['global/metrics/mean_rmse'] = mean_rmse
-    run['global/metrics/mean_mae'] = mean_mae
+    run[f'global/metrics/mean_rmse'].log(mean_rmse)
+    run[f'global/metrics/mean_mae'].log(mean_mae)
 
     name = save_pth + str(uuid.uuid4())
-    model.save(name)
-    run['global/model_name'] = name
-
-
-
-
-
-    
-
-
-    
-
-
-
-
-
+    model.save_model(name)
+    run[f'global/{i}/model_name'] = name
