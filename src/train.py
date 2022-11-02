@@ -1,45 +1,76 @@
-import catboost
-from sklearn.metrics import mean_absolute_error, mean_squared_error
-import pandas as pd
+import uuid
+from itertools import product
 
-def create_pool(x, y, cat_features, text_features):
+import catboost
+import neptune.new as neptune
+
+from sklearn.metrics import mean_absolute_error, mean_squared_error
+
+
+def create_pool(x, y, cat_features):
     return catboost.Pool(
-        data=x, label=y, cat_features=cat_features, text_features=text_features
+        data=x, label=y, cat_features=cat_features
     )
 
 
-def grid_search(params, dataset, f):
-    res = pd.DataFrame(columns=['iterations', 'lr', 'depth', 'rmse', 'mae'])
-    ind = 0
-    for i in params['iterations'].split(' - '):
-        for lr in params['lr'].split(' - '):
-            for d in params['depth'].split(' - '):
-                p = {
-                    'iterations': int(i),
-                    'learning_rate': float(lr),
-                    'depth': int(d) 
-                }
-                print(ind)
-                rmse, mae = cross_validation(dataset, f, p)
-                res.loc[ind] = [i, lr, d, rmse, mae]
-                ind += 1
-    return res
+def grid_search(dataset, config):
+    search_params = config['gs_params']
+    params_combination = [dict(
+            zip(tuple(search_params.keys()), (k))) 
+            for k in product(*search_params.values()
+    )]
+    model_configuration = config['params']
+    save_pth = config['model_save']
+    for parameters in params_combination:
+        run = neptune.init(
+            project=config['neptune']['project'],
+            api_token=config['neptune']['api_token']
+        )
+        parameters.update(model_configuration)
+        run['global/parameters'] = parameters
+        
+        model = catboost.CatBoostRegressor(**parameters)
+        categorical_features = config['features']['categorical']
+        cross_validation(dataset, model, categorical_features, run, save_pth)
+
+
+def cross_validation(dataset, model, categorical_features, run, save_pth):
+    mean_rmse, mean_mae = 0, 0
+    n = len(dataset)
+    for (x_train, x_test, y_train, y_test) in dataset:
+        train_pool = create_pool(x_train, y_train, categorical_features)
+        test_pool = create_pool(x_test, y_test, categorical_features)
+
+        model.fit(train_pool)
+        forecast = model.predict(test_pool)
+
+        fold_rmse = mean_squared_error(y_test, forecast, squared=False)
+        fold_mae = mean_absolute_error(y_test, forecast)
+
+        mean_rmse += fold_rmse
+        mean_mae += fold_mae
+        run[f"global/metrics/rmse"].log(fold_rmse)
+        run[f"global/metrics/mae"].log(fold_mae)
+
+    mean_rmse, mean_mae = mean_rmse/n, mean_mae/n
+
+    run['global/metrics/mean_rmse'] = mean_rmse
+    run['global/metrics/mean_mae'] = mean_mae
+
+    name = save_pth + str(uuid.uuid4())
+    model.save(name)
+    run['global/model_name'] = name
+
+
+
+
 
     
 
-def cross_validation(dataset, f, params):
-    n = len(dataset)
-    mse_score = 0
-    mae_score = 0
-    for train_x, test_x, train_y, test_y in dataset:
-        train = create_pool(train_x, train_y, f['cat'].split(' - '), f['text'].split(' - '))
-        test = create_pool(test_x, test_y, f['cat'].split(' - '), f['text'].split(' - '))
-        model = catboost.CatBoostRegressor(learning_rate=params['learning_rate'], depth=params['depth'], iterations=params['iterations'], loss_function='RMSE')
-        model.fit(train)
-        pred = model.predict(test)
-        mse_score += mean_squared_error(test_y, pred, squared=False)
-        mae_score += mean_absolute_error(test_y, pred)
-    mse_score /= n
-    mae_score /= n
-    return mse_score, mae_score
+
+    
+
+
+
+
 

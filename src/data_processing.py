@@ -32,7 +32,7 @@ class FeatureGenerator:
         agg_dict = {col: 'first' for col in columns}
         agg_dict['item_cnt_day'] = 'sum'
         df = sales_df.groupby(by=['item_id', 'shop_id', 'date_block_num']).agg(agg_dict).reset_index()
-        df = self.fill_item_count_zeros(df)
+        df = self.__fill_item_count_zeros(df)
         df = self.fit(df)
         return df
     
@@ -70,7 +70,7 @@ class FeatureGenerator:
             .drop(columns=['item_category_id_r'])
         return item_cat
     
-    def fill_item_count_zeros(self, df):
+    def __fill_item_count_zeros(self, df):
         min_v = df['date_block_num'].min()
         max_v = df['date_block_num'].max()
 

@@ -7,7 +7,7 @@ features:
           - shop_location
           - shop_city
   target: item_cnt_day
-  categorial: 
+  categorical: 
      - item_id
      - date_block_num
      - shop_id
@@ -17,7 +17,17 @@ features:
 
 train_data: data/processed/sales.csv
 
+dataset:
+  start: 3
+  window_size: 24
+
 params:
+  random_seed: 42
+  task_type: GPU
+  devices: 0:1
+  loss_function: RMSE
+
+gs_params:
   iterations: 
             - 10
             - 50
@@ -30,6 +40,8 @@ params:
        - 8
 
 shop: 36
+
+model_save: 'models/pfs_'
 
 neptune:
   project: nktrn/predict-future-sales

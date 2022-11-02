@@ -19,16 +19,13 @@ def train_model(ti):
     data = utils.load_data(config['train_data'])
     dataset = data_processing.TrainDataset(
         data,
-        config['features_config']['features'].split(' - '),
-        config['features_config']['target'].split(' - '),
-        24,
-        6
+        config['features']['features'],
+        config['features']['target'],
+        config['dataset']['window_size'],
+        config['dataset']['start']
     )
-    res = train.grid_search(config['model_config'], dataset, config['features_config'])
-    res.to_csv('/home/nktrn/D/predict_future_sales/data/res.csv', index=False)
-    return 0
+    train.grid_search(dataset, config)
     
-
 
 with DAG(
     dag_id='model_train_dag',
