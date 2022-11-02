@@ -1,3 +1,4 @@
+from distutils.command.config import config
 from airflow.models.dag import DAG
 from airflow.operators.python import PythonOperator
 
@@ -10,6 +11,7 @@ def read_config():
     config_path = 'configs/training_config.yaml'
     config = utils.read_config(config_path)
     return config
+
 
 def train_model(ti):
     config = ti.xcom_pull(task_ids=['read_config'])[0]
@@ -26,8 +28,23 @@ def train_model(ti):
         config['dataset']['window_size'],
         config['dataset']['start']
     )
-    train.grid_search(dataset, config)
+    res = train.grid_search(dataset, config)
+    return res
+
+
+def upload_model(ti):
+    xcoms = ti.xcom_pull(task_ids=['read_config', 'train_model'])
+    config = xcoms[0]
+    res = xcoms[1]
+    if not config:
+        raise Exception('No config file.')
+    if not res:
+        raise Exception('No res dict.')
     
+    train.track_best_model(res, config)
+    
+    
+
 
 with DAG(
     dag_id='model_train_dag',
@@ -42,9 +59,16 @@ with DAG(
         do_xcom_push=True
     )
 
-    # ETL
+    # Train model
     task_etl = PythonOperator(
         task_id='train_model',
-        python_callable=train_model
+        python_callable=train_model,
+        do_xcom_push=True
     )
-    task_read_config >> task_etl
+    
+    # Upload best model
+    task_upload = PythonOperator(
+        task_id='upload_model',
+        python_callable=upload_model 
+    )
+    task_read_config >> task_etl >> task_upload

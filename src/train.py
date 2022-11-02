@@ -1,7 +1,9 @@
+from symbol import parameters
 import uuid
 from itertools import product
 
 import catboost
+from matplotlib.pyplot import get
 import neptune.new as neptune
 
 import numpy as np
@@ -26,14 +28,24 @@ def grid_search(dataset, config):
     run = neptune.init(
             project=config['neptune']['project'],
             api_token=config['neptune']['api_token']
-        )
+    )
+    
+    res = []
     for i, parameters in enumerate(params_combination):
         parameters.update(model_configuration)
         run[f'global/{i}/parameters'] = parameters
         
         model = catboost.CatBoostRegressor(**parameters)
         categorical_features = config['features']['categorical']
-        cross_validation(dataset, model, categorical_features, run, save_pth, i)
+        rmse, mae, model_name = cross_validation(dataset, model, categorical_features, run, save_pth, i)
+        _ = {}
+        _['parameters'] = parameters
+        _['rmse'] = rmse
+        _['mae'] = mae
+        _['model_name'] = model_name
+        res.append(_)
+    run.stop()
+    return res
 
 
 def cross_validation(dataset, model, categorical_features, run, save_pth, i):
@@ -61,6 +73,32 @@ def cross_validation(dataset, model, categorical_features, run, save_pth, i):
     run[f'global/metrics/mean_rmse'].log(mean_rmse)
     run[f'global/metrics/mean_mae'].log(mean_mae)
 
-    name = save_pth + str(uuid.uuid4())
+    name = f'{save_pth}{str(uuid.uuid4())}.cbm'
     model.save_model(name)
     run[f'global/{i}/model_name'] = name
+    return mean_rmse, mean_mae, name
+
+
+def track_best_model(res, config):
+    model_version = neptune.init_model_version(
+        model="PFS-CTR1",
+        project=config['neptune']['project'],
+        api_token=config['neptune']['api_token']
+    )
+    best_model = get_best_model(res, 'mae')
+    model_version['info/parameters'] = best_model['parameters']
+    model_version['info/rmse'] = best_model['rmse']
+    model_version['info/mae'] = best_model['mae']
+    model_version['info/name'] = best_model['model_name']
+    model_version['model'].upload(best_model['model_name'])
+    model_version.stop()
+
+
+def get_best_model(res, type):
+    m = 1000
+    ret = None
+    for ind, i in enumerate(res):
+        if i[type] <= m:
+            ret = i
+            m = i[type]
+    return ret
